@@ -8,6 +8,8 @@ class System:
         self.device = pcb_module
         self.interconnect = interconnect
 
+    def __str__(self):
+        return f"[Device: [{self.device}], Interconnect: [{self.interconnect}]]"
 
 system_dict = {
     "A100_4_fp16": System(

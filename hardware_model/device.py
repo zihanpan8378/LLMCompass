@@ -13,7 +13,9 @@ class Device:
         self.compute_module = compute_module
         self.io_module = io_module
         self.memory_module = memory_module
-
+        
+    def __str__(self):
+        return f"Compute module: [{self.compute_module}], IO module: [{self.io_module}], Memory module: [{self.memory_module}]"
 
 device_dict = {
     "A100_80GB_fp16": Device(

@@ -281,6 +281,11 @@ def find_cheapest_design(
 
 if __name__ == "__main__":
     # test_template_to_system()
-    find_cheapest_design(12288, 96, 96, 8, 2048, 5, 1024, 0.1)
+    #find_cheapest_design(12288, 96, 96, 8, 2048, 5, 1024, 0.1)
+    
+    
+    file_path = "configs/GA100.json"
+    arch_specs = read_architecture_template(file_path)
+    print(template_to_system(arch_specs))
     
     

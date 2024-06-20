@@ -22,6 +22,8 @@ class VectorUnit:
         )
         self.data_type = data_type
 
+    def __str__(self):
+        return f"total_vector_flops_per_cycle: {self.total_vector_flops_per_cycle}, word_size: {self.word_size}, flops_per_exp: {self.flops_per_exp}, vector_width: {self.vector_width}, vector_count: {self.vector_count}, Data type: [{self.data_type}]"
 
 vector_unit_dict = {
     "A100_fp16": VectorUnit(512, 2, 35, 32, 4),
@@ -45,6 +47,9 @@ class SystolicArray:
         self.mac_per_cycle = mac_per_cycle
         self.input_word_size = input_word_size
         self.output_word_size = output_word_size
+        
+    def __str__(self):
+        return f"array_height: {self.array_height}, array_width: {self.array_width}, mac_per_cycle: {self.mac_per_cycle}, input_word_size: {self.input_word_size}, output_word_size: {self.output_word_size}"
 
 
 systolic_array_dict = {
@@ -71,6 +76,8 @@ class Core:
         # assert(vector_unit.word_size==systolic_array.word_size)
         self.vector_word_size = vector_unit.word_size
 
+    def __str__(self):
+        return f"Vector unit: [{self.vector_unit}], Systolic array: [{self.systolic_array}], systolic_array_count: {self.systolic_array_count} SRAM_size: {self.SRAM_size}, vector_word_size: {self.vector_word_size}"
 
 core_dict = {
     "SM_A100_fp16": Core(
@@ -145,6 +152,8 @@ class ComputeModule:
         )
         self.overhead = overhead
 
+    def __str__(self):
+        return f"Core: [{self.core}], core_count: {self.core_count}, clock_freq: {self.clock_freq}, l2_size: {self.l2_size}, l2_bandwidth_per_cycle: {self.l2_bandwidth_per_cycle}"
 
 compute_module_dict = {
     "A100_fp16": ComputeModule(

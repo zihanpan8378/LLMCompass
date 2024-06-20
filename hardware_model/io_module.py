@@ -2,6 +2,9 @@ class IOModule:
     def __init__(self, bandwidth, latency):
         self.bandwidth = bandwidth
         self.latency = latency
+        
+    def __str__(self):
+        return f"bandwidth: {self.bandwidth}, latency: {self.latency}"
 
 
 IO_module_dict = {

@@ -24,6 +24,8 @@ class LinkModule:
         self.max_payload_size = max_payload_size
         self.header_size = ceil(header_size / flit_size) * flit_size
 
+    def __str__(self):
+        return f"bandwidth_per_direction: {self.bandwidth_per_direction}, bandwidth_both_direction: {self.bandwidth_both_direction}, latency: {self.latency}, flit_size: {self.flit_size}, max_payload_size: {self.max_payload_size}, header_size: {self.header_size}"
 
 link_module_dict = {
     "NVLinkV3": LinkModule(25e9, 50e9, 8.92e-6, 16, 256, 16),
@@ -49,6 +51,9 @@ class InterConnectModule:
             internal_link_bandwidth_per_direction
         )
         pass
+    
+    def __str__(self):
+        return f"device_count: {self.device_count}, topology: {self.topology}, Link module: [{self.link_module}], link_count_per_device: {self.link_count_per_device}, internal_link_bandwidth_per_direction: {self.internal_link_bandwidth_per_direction}"
 
 
 # we treat the 2D torus interconnect of 8 TPU cores as 2 rings + internal link
