@@ -2,6 +2,7 @@ from utils import size, closest_factors
 from typing import List, Tuple, Union
 from hardware_model.device import Device
 from software_model.utils import Tensor, DataType
+from energy_model.energy_model import EnergyModel
 
 
 class Operator:
@@ -31,6 +32,7 @@ class Operator:
         self.is_io_bound = None
         # run on gpu
         self.iterations = 50
+        self.energy_model = EnergyModel(process_node="7nm", memory_node="HBM2")
 
     class mapping:
         pass

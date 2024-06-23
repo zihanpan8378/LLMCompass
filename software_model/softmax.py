@@ -3,6 +3,7 @@ from typing import List, Tuple
 from hardware_model.device import Device
 from software_model.operators import Operator
 from software_model.utils import Tensor, DataType
+from energy_model.energy_model import EnergyModel
 from math import ceil, log2
 import torch
 import time
@@ -70,25 +71,30 @@ class Softmax(Operator):
         M = self.computational_graph.M
         N = self.computational_graph.N
         data_type = self.computational_graph.data_type
+        word_size = data_type.word_size
         l2_tile_N = N
         l2_tile_M = (
-            pcb_module.compute_module.l2_size // (l2_tile_N * data_type.word_size)
+            pcb_module.compute_module.l2_size // (l2_tile_N * word_size)
         )
         l2_tile_M = min(l2_tile_M, M)
         is_l2_double_buffering = False
+        
+        memory_to_l2_transfer_energy = self.energy_model.transfer_memory_l2(l2_tile_M * l2_tile_N * word_size * 8) * ((M / l2_tile_M) * (N / l2_tile_N))
+        self.energy_consumption = 0
+        
         for l1_N_tiling_factor in [1, 2, 4, 8, 16, 32]:
             l1_tile_N = ceil(l2_tile_N / l1_N_tiling_factor)
             for l1_tile_M in [1, 2, 4, 8, 16, 32, 64, 128, 256]:
                 for is_l1_double_buffering in [True, False]:
                     if is_l1_double_buffering:
                         if (
-                            l1_tile_M * l1_tile_N * data_type.word_size
+                            l1_tile_M * l1_tile_N * word_size
                             > pcb_module.compute_module.core.SRAM_size // 2
                         ):
                             continue
                     else:
                         if (
-                            l1_tile_M * l1_tile_N * data_type.word_size
+                            l1_tile_M * l1_tile_N * word_size
                             > pcb_module.compute_module.core.SRAM_size
                         ):
                             continue
@@ -100,18 +106,25 @@ class Softmax(Operator):
                         l1_tile_N,
                         is_l1_double_buffering,
                     )
+                    
+                    l2_to_l1_transfer_energy = self.energy_model.transfer_l2_l1(l1_tile_M * l1_tile_N * word_size * 8) * ((l2_tile_M / l1_tile_M) * (l2_tile_N / l1_tile_N))
+                    
                     cycle_count = self.simulate(
                         self.computational_graph, mapping, pcb_module
                     )
+                    
+                    compute_energy = self.energy_model.compute(cycle_count)
+                    
                     if cycle_count < min_cycle_count:
                         min_cycle_count = cycle_count
                         best_mapping = mapping
+                        self.energy_consumption = memory_to_l2_transfer_energy + l2_to_l1_transfer_energy + compute_energy
         self.best_mapping = best_mapping
         self.best_cycle_count = min_cycle_count
         self.best_latency = min_cycle_count / pcb_module.compute_module.clock_freq
         self.latency = self.best_latency
         # self.best_mapping.display()
-        return self.latency
+        return self.latency, self.energy_consumption
 
     def simulate(
         self,
