@@ -3,6 +3,7 @@ from typing import List, Tuple
 from hardware_model.device import Device
 from software_model.operators import Operator
 from software_model.utils import Tensor, DataType
+from energy_model.energy_model import EnergyModel
 from math import ceil, log2, floor
 import torch
 import time
@@ -282,6 +283,16 @@ class Matmul(Operator):
         M = self.computational_graph.M
         N = self.computational_graph.N
         K = self.computational_graph.K
+        
+        data_type = self.data_type
+        word_size = data_type.word_size
+        self.energy_consumption = 0
+        
+        self.energy_model = EnergyModel(
+            process_node=pcb_module.compute_module.process_node,
+            memory_node=pcb_module.memory_module.memory_node
+        )
+        
         if (M == 1 or N == 1) and (
             compile_mode == "heuristic-GPU"
             or compile_mode == "heuristic-our-throughput"
@@ -539,6 +550,13 @@ class Matmul(Operator):
                             is_l2_double_buffering = True
                         else:
                             is_l2_double_buffering = False
+                        
+                        l2_working_set_size = working_set_size
+                        memory_to_l2_transfer_energy = self.energy_model.transfer_memory_l2(
+                            (l2_working_set_size + l2_tile_M * l2_tile_N) * 
+                            (2 if is_l2_double_buffering else 1) * 
+                            word_size * 8
+                        ) * ((M / l2_tile_M) * (N / l2_tile_N) * (K / l2_tile_K))
 
                         for l1_tile_M in [32, 64, 128, 256]:
                             if l1_tile_M > min(l2_tile_M, l2_tile_N):
@@ -557,6 +575,17 @@ class Matmul(Operator):
                                     continue
                                 l2_loop_order = "knm"
                                 l1_loop_order = "knm"
+                                
+                                l1_working_set_size = (
+                                    l1_tile_M * l1_tile_N
+                                    + l1_tile_N * l1_tile_K
+                                    + l1_tile_M * l1_tile_K
+                                )
+                                l2_to_l1_transfer_energy = self.energy_model.transfer_memory_l2(
+                                    (l1_working_set_size + l1_tile_M * l1_tile_N) * 
+                                    word_size * 8
+                                ) * ((l2_tile_M / l1_tile_M) * (l2_tile_N / l1_tile_N) * (l2_tile_K / l1_tile_K))
+                                
                                 for (
                                     l0_M_tiling_factor,
                                     l0_N_tiling_factor,
@@ -588,9 +617,27 @@ class Matmul(Operator):
                                     end = time.time()
                                     # if i % 1000 == 0:
                                     #     print(f"{i} simulation time: {end-start}")
+                                    
+                                    l0_working_set_size = (
+                                        (l1_tile_M // l0_M_tiling_factor) * (l1_tile_N // l0_N_tiling_factor)
+                                        + (l1_tile_N // l0_N_tiling_factor) * (l1_tile_K // l0_K_tiling_factor)
+                                        + (l1_tile_M // l0_M_tiling_factor) * (l1_tile_K // l0_K_tiling_factor)
+                                    )
+                                    l1_to_l0_transfer_energy = self.energy_model.transfer_memory_l2(
+                                        (l0_working_set_size + (l1_tile_M // l0_M_tiling_factor) * (l1_tile_N // l0_N_tiling_factor)) * 
+                                        word_size * 8
+                                    ) * (l0_M_tiling_factor * l0_N_tiling_factor * l0_K_tiling_factor)
+                                    compute_energy = self.energy_model.compute(cycle_count)
+                                    
                                     if cycle_count < min_cycle_count:
                                         min_cycle_count = cycle_count
                                         best_mapping = mapping
+                                        self.energy_consumption = {}
+                                        self.energy_consumption['total'] = round(memory_to_l2_transfer_energy + l2_to_l1_transfer_energy + l1_to_l0_transfer_energy + compute_energy, 4)
+                                        self.energy_consumption['memory_to_l2_transfer'] = round(memory_to_l2_transfer_energy, 4)
+                                        self.energy_consumption['l2_to_l1_transfer'] = round(l2_to_l1_transfer_energy, 4)
+                                        self.energy_consumption['l1_to_l0_transfer'] = round(l1_to_l0_transfer_energy, 4)
+                                        self.energy_consumption['compute'] = round(compute_energy, 4)
             # print("total dse times:", i)
         elif compile_mode == "heuristic-TPU":
             l2_tile_M = self.computational_graph.M
@@ -737,7 +784,7 @@ class Matmul(Operator):
         self.best_latency = min_cycle_count / pcb_module.compute_module.clock_freq
         self.latency = self.best_latency
         # self.best_mapping.display()
-        return self.latency
+        return self.latency, self.energy_consumption
 
     def simulate(
         self,
