@@ -34,7 +34,7 @@ if __name__ == "__main__":
     titile = f"Performance of Matmul with K={K}, N={N}"
     print(f"{titile}")
     
-    for M in range(5, 10):
+    for M in range(5, 16):
         M = 2**M
         model = Matmul(data_type=data_type_dict["fp16"])
         _ = model(
@@ -58,7 +58,7 @@ if __name__ == "__main__":
 
     M = 8192
     print(f"Performance of Matmul with M={M}, N=K")
-    for K in range(5, 10):
+    for K in range(5, 16):
         K = 2**K
         N = K
         model = Matmul(data_type=data_type_dict["fp16"])
