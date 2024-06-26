@@ -65,6 +65,7 @@ def template_to_system(arch_specs):
         device_specs["frequency_Hz"],
         io_specs["global_buffer_MB"] * 1024 * 1024,
         io_specs["global_buffer_bandwidth_per_cycle_byte"],
+        compute_chiplet_specs['process_node'],
         overhead_dict["A100"],
     )
     # io module
@@ -77,7 +78,8 @@ def template_to_system(arch_specs):
     )
     # memory module
     memory_module = MemoryModule(
-        device_specs["memory"]["total_capacity_GB"] * 1024 * 1024 * 1024
+        device_specs["memory"]["total_capacity_GB"] * 1024 * 1024 * 1024,
+        device_specs['memory_protocol']
     )
     # device
     device = Device(compute_module, io_module, memory_module)
@@ -284,7 +286,7 @@ if __name__ == "__main__":
     #find_cheapest_design(12288, 96, 96, 8, 2048, 5, 1024, 0.1)
     
     
-    file_path = "configs/GA100.json"
+    file_path = "configs/RTX4090.json"
     arch_specs = read_architecture_template(file_path)
     print(template_to_system(arch_specs))
     

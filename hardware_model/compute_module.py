@@ -113,6 +113,9 @@ class Overhead:
         self.softmax = softmax
         self.layernorm = layernorm
         self.gelu = gelu
+        
+    def __str__(self):
+        return f"matmul: {self.matmul}, softmax: {self.softmax}, layernorm: {self.layernorm}, gelu: {self.gelu}"
 
 
 overhead_dict = {
@@ -130,6 +133,7 @@ class ComputeModule:
         clock_freq,
         l2_size,
         l2_bandwidth_per_cycle,
+        process_node = '7nm',
         overhead: Overhead = overhead_dict["A100"],
     ):
         self.core = core
@@ -150,10 +154,11 @@ class ComputeModule:
             * core.systolic_array.array_width
             * clock_freq
         )
+        self.process_node = process_node
         self.overhead = overhead
 
     def __str__(self):
-        return f"Core: [{self.core}], core_count: {self.core_count}, clock_freq: {self.clock_freq}, l2_size: {self.l2_size}, l2_bandwidth_per_cycle: {self.l2_bandwidth_per_cycle}"
+        return f"Core: [{self.core}], core_count: {self.core_count}, clock_freq: {self.clock_freq}, l2_size: {self.l2_size}, l2_bandwidth_per_cycle: {self.l2_bandwidth_per_cycle}, process_node: {self.process_node}, overhead: [{self.overhead}]"
 
 compute_module_dict = {
     "A100_fp16": ComputeModule(
