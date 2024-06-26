@@ -79,8 +79,16 @@ class Softmax(Operator):
         l2_tile_M = min(l2_tile_M, M)
         is_l2_double_buffering = False
         
-        memory_to_l2_transfer_energy = self.energy_model.transfer_memory_l2(l2_tile_M * l2_tile_N * word_size * 8) * ((M / l2_tile_M) * (N / l2_tile_N))
+        self.energy_model = EnergyModel(
+            process_node=pcb_module.compute_module.process_node,
+            memory_node=pcb_module.memory_module.memory_node
+        )
+        
         self.energy_consumption = 0
+        memory_to_l2_transfer_energy = self.energy_model.transfer_memory_l2(
+            l2_tile_M * l2_tile_N * 
+            word_size * 8
+        ) * ((M / l2_tile_M) * (N / l2_tile_N))
         
         for l1_N_tiling_factor in [1, 2, 4, 8, 16, 32]:
             l1_tile_N = ceil(l2_tile_N / l1_N_tiling_factor)
@@ -118,7 +126,11 @@ class Softmax(Operator):
                     if cycle_count < min_cycle_count:
                         min_cycle_count = cycle_count
                         best_mapping = mapping
-                        self.energy_consumption = memory_to_l2_transfer_energy + l2_to_l1_transfer_energy + compute_energy
+                        self.energy_consumption = {}
+                        self.energy_consumption['total'] = round(memory_to_l2_transfer_energy + l2_to_l1_transfer_energy + compute_energy, 4)
+                        self.energy_consumption['memory_to_l2_transfer'] = round(memory_to_l2_transfer_energy, 4)
+                        self.energy_consumption['l2_to_l1_transfer'] = round(l2_to_l1_transfer_energy, 4)
+                        self.energy_consumption['compute'] = compute_energy
         self.best_mapping = best_mapping
         self.best_cycle_count = min_cycle_count
         self.best_latency = min_cycle_count / pcb_module.compute_module.clock_freq

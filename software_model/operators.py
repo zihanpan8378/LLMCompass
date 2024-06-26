@@ -32,7 +32,6 @@ class Operator:
         self.is_io_bound = None
         # run on gpu
         self.iterations = 50
-        self.energy_model = EnergyModel(process_node="7nm", memory_node="HBM2")
 
     class mapping:
         pass
