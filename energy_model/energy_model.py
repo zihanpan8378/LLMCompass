@@ -1,7 +1,7 @@
 
-process_node_mapper = {
+process_node_mapper = { # not real values
     '7nm': {
-        'l2': 0.12,
+        'l2': 0.12, #  gussed with A Method to Estimate the Energy Consumption of Deep Neural Networks
         'l1': 0.04,
         'l0': 0.02,
         # 'SRAM_read': 0.3,
@@ -11,13 +11,19 @@ process_node_mapper = {
         # 'l1_l2_distance': 0,
         # 'l0_l1_overhead': 0,
         # 'l1_l2_overhead': 0,
-        'energy_per_flop': 1.25
+        'energy_per_flop': 1.1 # Trends in Energy Estimates for Computing in AI/Machine Learning Accelerators, Supercomputers, and Compute-Intensive Applications
     },
+    '4nm': {
+        'l2': 0.12,
+        'l1': 0.04,
+        'l0': 0.02,
+        'energy_per_flop': 0.7
+    }
 }
 
 memory_node_mapper = {
-    'HBM2': {
-        'Average_Device_Power': 3.97
+    'HBM2e': {
+        'Average_Device_Power': 3.97 # Fine-Grained DRAM: Energy-Efficient DRAM for Extreme Bandwidth Systems
         # 'DRAM_activate': 1.21,
         # 'DRAM_IO': 0.22,
         # 'DRAM_transfer': 2.54,
@@ -25,18 +31,13 @@ memory_node_mapper = {
         # 'overhead': 0,
     },
     'GDDR5': {
-        'Average_Device_Power': 14.0
-        # 'DRAM_activate': 14.0,
-        # 'DRAM_IO': 0,
-        # 'DRAM_transfer': 0,
-        # 'link_distance': 10,
-        # 'overhead': 0,
+        'Average_Device_Power': 14.0 # Fine-Grained DRAM: Energy-Efficient DRAM for Extreme Bandwidth Systems
     },
     'GDDR5X': {
-        'Average_Device_Power': 8.0,
+        'Average_Device_Power': 8.0, # https://www.micron.com/products/memory/hbm/gddr6x
     },
     'GDDR6': {
-        'Average_Device_Power': 7.5,
+        'Average_Device_Power': 7.5, # https://www.micron.com/products/memory/hbm/gddr6x
     },
     'GDDR6X': {
         'Average_Device_Power': 7.25,  # https://www.micron.com/products/memory/hbm/gddr6x

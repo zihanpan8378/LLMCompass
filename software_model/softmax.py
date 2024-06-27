@@ -121,7 +121,7 @@ class Softmax(Operator):
                         self.computational_graph, mapping, pcb_module
                     )
                     
-                    compute_energy = self.energy_model.compute(cycle_count)
+                    compute_energy = self.energy_model.compute(M * N)
                     
                     if cycle_count < min_cycle_count:
                         min_cycle_count = cycle_count

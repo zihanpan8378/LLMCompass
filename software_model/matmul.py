@@ -627,7 +627,7 @@ class Matmul(Operator):
                                         (l0_working_set_size + (l1_tile_M // l0_M_tiling_factor) * (l1_tile_N // l0_N_tiling_factor)) * 
                                         word_size * 8
                                     ) * (l0_M_tiling_factor * l0_N_tiling_factor * l0_K_tiling_factor)
-                                    compute_energy = self.energy_model.compute(cycle_count)
+                                    compute_energy = self.energy_model.compute(M * N * K) # self.energy_model.compute(cycle_count)
                                     
                                     if cycle_count < min_cycle_count:
                                         min_cycle_count = cycle_count
