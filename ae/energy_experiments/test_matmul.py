@@ -7,27 +7,37 @@ import os
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("-m", "--mode", type=str, default="sim", help="sim: simulation, gpu: run on GPU")
+    parser.add_argument("-d", "--device", type=str, help="device to simulate: A100, RTX4090")
     parser.add_argument("--gpu", action="store_true", help="Enable GPU")
     parser.add_argument("--simgpu", action="store_true", help="Enable simulation")
     args = parser.parse_args()
 
-    A100 = device_dict["A100_80GB_fp16"]
-    RTX4090 = template_to_system(read_architecture_template("configs/RTX4090.json")).device
+    device_name = args.device
+    if device_name == "A100":
+        system = template_to_system(read_architecture_template("configs/GA100.json"))
+        
+    elif device_name == "RTX4090":
+        system = template_to_system(read_architecture_template("configs/RTX4090.json"))
+    device = system.device
     gpu_overhead = 2.1e-5
     
-    device = RTX4090
-    
-    device_name = "RTX4090"
     print(f"Device: {device_name} {device}")
     
-    file_name=f'ae/energy_experiments/matmul_{device_name}_sim.csv'
+    if args.mode == "gpu":
+        args.gpu = True
+        file_name = f'ae/energy_experiments/matmul_{device_name}_gpu.csv'
+        gpu_kernel_launch_overhead = Matmul.gpu_kernel_launch_overhead()
+    elif args.mode == "sim":
+        args.simgpu = True
+        file_name = f'ae/energy_experiments/matmul_{device_name}_sim.csv'
+    else:
+        raise ValueError("Invalid mode")
+    
     if os.path.exists(file_name):
         os.remove(file_name)
         with open(file_name, 'w') as f:
             f.write('')
-    
-    if args.gpu:
-        gpu_kernel_launch_overhead = Matmul.gpu_kernel_launch_overhead()
 
     K = 12288
     N = K
@@ -54,7 +64,7 @@ if __name__ == "__main__":
         tflops = 2 * M * N * K / latency / 1e12
         print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {energy}", flush=True)
         with open(file_name, 'a') as f:
-            f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {energy}\n")
+            f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {energy['total']}, {energy['memory_to_l2_transfer']}, {energy['l2_to_l1_transfer']}, {energy['l1_to_l0_transfer']}, {energy['compute']}\n")
 
     M = 8192
     print(f"Performance of Matmul with M={M}, N=K")
@@ -76,4 +86,6 @@ if __name__ == "__main__":
         tflops = 2 * M * N * K / latency / 1e12
         print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {energy}", flush=True)
         with open(file_name, 'a') as f:
-            f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {energy}\n")
+            f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {energy['total']}, {energy['memory_to_l2_transfer']}, {energy['l2_to_l1_transfer']}, {energy['l1_to_l0_transfer']}, {energy['compute']}\n")
+            
+    print("\n")
