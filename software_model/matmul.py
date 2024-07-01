@@ -285,7 +285,6 @@ class Matmul(Operator):
         K = self.computational_graph.K
         
         data_type = self.data_type
-        word_size = data_type.word_size
         self.energy_consumption = 0
         
         self.energy_model = EnergyModel(
@@ -550,13 +549,6 @@ class Matmul(Operator):
                             is_l2_double_buffering = True
                         else:
                             is_l2_double_buffering = False
-                        
-                        l2_working_set_size = working_set_size
-                        memory_to_l2_transfer_energy = self.energy_model.transfer_memory_l2(
-                            (l2_working_set_size + l2_tile_M * l2_tile_N) * 
-                            (2 if is_l2_double_buffering else 1) * 
-                            word_size * 8
-                        ) * ((M / l2_tile_M) * (N / l2_tile_N) * (K / l2_tile_K))
 
                         for l1_tile_M in [32, 64, 128, 256]:
                             if l1_tile_M > min(l2_tile_M, l2_tile_N):
@@ -575,16 +567,6 @@ class Matmul(Operator):
                                     continue
                                 l2_loop_order = "knm"
                                 l1_loop_order = "knm"
-                                
-                                l1_working_set_size = (
-                                    l1_tile_M * l1_tile_N
-                                    + l1_tile_N * l1_tile_K
-                                    + l1_tile_M * l1_tile_K
-                                )
-                                l2_to_l1_transfer_energy = self.energy_model.transfer_memory_l2(
-                                    (l1_working_set_size + l1_tile_M * l1_tile_N) * 
-                                    word_size * 8
-                                ) * ((l2_tile_M / l1_tile_M) * (l2_tile_N / l1_tile_N) * (l2_tile_K / l1_tile_K))
                                 
                                 for (
                                     l0_M_tiling_factor,
@@ -609,35 +591,18 @@ class Matmul(Operator):
                                         l0_N_tiling_factor,
                                         l0_K_tiling_factor,
                                     )
-                                    cycle_count = self.simulate(
+                                    cycle_count, energy_consumption = self.simulate(
                                         self.computational_graph,
                                         mapping,
                                         pcb_module,
                                     )
                                     end = time.time()
-                                    # if i % 1000 == 0:
-                                    #     print(f"{i} simulation time: {end-start}")
-                                    
-                                    l0_working_set_size = (
-                                        (l1_tile_M // l0_M_tiling_factor) * (l1_tile_N // l0_N_tiling_factor)
-                                        + (l1_tile_N // l0_N_tiling_factor) * (l1_tile_K // l0_K_tiling_factor)
-                                        + (l1_tile_M // l0_M_tiling_factor) * (l1_tile_K // l0_K_tiling_factor)
-                                    )
-                                    l1_to_l0_transfer_energy = self.energy_model.transfer_memory_l2(
-                                        (l0_working_set_size + (l1_tile_M // l0_M_tiling_factor) * (l1_tile_N // l0_N_tiling_factor)) * 
-                                        word_size * 8
-                                    ) * (l0_M_tiling_factor * l0_N_tiling_factor * l0_K_tiling_factor)
-                                    compute_energy = self.energy_model.compute(M * N * K) # self.energy_model.compute(cycle_count)
                                     
                                     if cycle_count < min_cycle_count:
                                         min_cycle_count = cycle_count
                                         best_mapping = mapping
-                                        self.energy_consumption = {}
-                                        self.energy_consumption['total'] = round(memory_to_l2_transfer_energy + l2_to_l1_transfer_energy + l1_to_l0_transfer_energy + compute_energy, 4)
-                                        self.energy_consumption['memory_to_l2_transfer'] = round(memory_to_l2_transfer_energy, 4)
-                                        self.energy_consumption['l2_to_l1_transfer'] = round(l2_to_l1_transfer_energy, 4)
-                                        self.energy_consumption['l1_to_l0_transfer'] = round(l1_to_l0_transfer_energy, 4)
-                                        self.energy_consumption['compute'] = round(compute_energy, 4)
+                                        self.energy_consumption = energy_consumption
+                                        
             # print("total dse times:", i)
         elif compile_mode == "heuristic-TPU":
             l2_tile_M = self.computational_graph.M
@@ -834,6 +799,13 @@ class Matmul(Operator):
         l2_tile_M = mapping.l2_tile_M
         l2_tile_N = mapping.l2_tile_N
         l2_tile_K = mapping.l2_tile_K
+        
+        energy_consumption = {
+            'memory_to_l2_transfer': 0, 
+            'l2_to_l1_transfer': 0, 
+            'l1_to_l0_transfer': 0, 
+            'compute': self.energy_model.compute(M * N * K)
+        }
 
         if mapping.is_l2_double_buffering:
             assert (
@@ -940,6 +912,14 @@ class Matmul(Operator):
                 self.look_up_table,
             )
 
+        total_memory_to_l2_data_count = 0
+        total_memory_to_l2_data_count += (
+            l2_tiles[0, 0, 0].M_K_io_data_count + l2_tiles[0, 0, 0].K_N_io_data_count
+        )
+        
+        total_l2_to_l1_data_count = 0
+        total_l2_to_l1_data_count += l2_tiles[0, 0, 0].l2_l1_data_count
+        
         total_cycle_count = 0
         total_cycle_count += (
             l2_tiles[0, 0, 0].M_K_io_cycle_count + l2_tiles[0, 0, 0].K_N_io_cycle_count
@@ -962,16 +942,28 @@ class Matmul(Operator):
             previous_l2_tile = l2_tiles[previous_m, previous_n, previous_k]
 
             # current tile read latency
+            current_tile_read_data_count = 0
+            current_tile_read_cycle_count = 0
             if m == previous_m and k == previous_k:
+                current_tile_read_data_count = l2_tile.K_N_io_data_count
                 current_tile_read_cycle_count = l2_tile.K_N_io_cycle_count
             elif n == previous_n and k == previous_k:
+                current_tile_read_data_count = l2_tile.M_K_io_data_count
                 current_tile_read_cycle_count = l2_tile.M_K_io_cycle_count
             else:
+                current_tile_read_data_count = (
+                    l2_tile.M_K_io_data_count + l2_tile.K_N_io_data_count
+                )
                 current_tile_read_cycle_count = (
                     l2_tile.M_K_io_cycle_count + l2_tile.K_N_io_cycle_count
                 )
             if k > 0 and not (m == previous_m and n == previous_n):
+                current_tile_read_data_count += l2_tile.M_N_io_data_count
                 current_tile_read_cycle_count += l2_tile.M_N_io_cycle_count
+                
+            previous_l2_l1_data_count = previous_l2_tile.l2_l1_data_count
+            total_l2_to_l1_data_count += previous_l2_l1_data_count
+            
             # previous tile compute latency
             previous_tile_compute_cycle_count = previous_l2_tile.compute_cycle_count
             if k > 0:
@@ -979,9 +971,12 @@ class Matmul(Operator):
                     previous_l2_tile.K_reduction_cycle_count
                 )
             # previous tile write latency
+            previous_tile_write_data_count = 0
+            previous_tile_write_cycle_count = 0
             if m == previous_m and n == previous_n:
                 previous_tile_write_cycle_count = 0
             else:
+                previous_tile_write_data_count = previous_l2_tile.M_N_io_data_count
                 previous_tile_write_cycle_count = previous_l2_tile.M_N_io_cycle_count
 
             # read current tile, compute previous tile, write previous tile
@@ -998,12 +993,17 @@ class Matmul(Operator):
                     + previous_tile_compute_cycle_count
                     + previous_tile_write_cycle_count
                 )
+            total_memory_to_l2_data_count += (
+                current_tile_read_data_count + previous_tile_write_data_count
+            )
 
             previous_m = m
             previous_n = n
             previous_k = k
 
         # compute and write last tile
+        total_memory_to_l2_data_count += l2_tiles[-1, -1, -1].M_K_io_data_count
+        total_l2_to_l1_data_count += l2_tiles[-1, -1, -1].l2_l1_data_count
         total_cycle_count += (
             l2_tiles[-1, -1, -1].M_N_io_cycle_count
             + l2_tiles[-1, -1, -1].compute_cycle_count
@@ -1011,8 +1011,13 @@ class Matmul(Operator):
 
         if previous_k > 0:
             total_cycle_count += ceil(l2_tiles[-1, -1, -1].K_reduction_cycle_count)
+            
+        energy_consumption['memory_to_l2_transfer'] = self.energy_model.transfer_memory_l2(total_memory_to_l2_data_count * 8)
+        energy_consumption['l2_to_l1_transfer'] = self.energy_model.transfer_l2_l1(total_l2_to_l1_data_count * 8)
+        energy_consumption['total'] = energy_consumption['memory_to_l2_transfer'] + energy_consumption['l2_to_l1_transfer'] + energy_consumption['compute']
 
-        return total_cycle_count #+ ceil(
+        return total_cycle_count, energy_consumption
+        #+ ceil(
         # pcb_module.io_module.latency * 2 * pcb_module.compute_module.clock_freq
         # )
 
@@ -1040,26 +1045,32 @@ class Matmul(Operator):
                 / pcb_module.compute_module.l2_bandwidth_per_cycle
             )
             self.K_reduction_io_count = 2 * M * N * data_type.word_size
+            self.M_K_io_data_count = self.simulate_l2_tile_io_data_count(M, K, data_type)
             self.M_K_io_cycle_count = self.simulate_l2_tile_io_cycle_count(
-                M, K, data_type, pcb_module
+                self.M_K_io_data_count, pcb_module
             )
+            self.K_N_io_data_count = self.simulate_l2_tile_io_data_count(K, N, data_type)
             self.K_N_io_cycle_count = self.simulate_l2_tile_io_cycle_count(
-                K, N, data_type, pcb_module
+                self.K_N_io_data_count, pcb_module
             )
+            self.M_N_io_data_count = self.simulate_l2_tile_io_data_count(M, N, data_type)
             self.M_N_io_cycle_count = self.simulate_l2_tile_io_cycle_count(
-                M, N, data_type, pcb_module
+                self.M_N_io_data_count, pcb_module
             )
-            self.compute_cycle_count = self.simulate_l2_tile_compute_cycle_count(
+            self.compute_cycle_count, self.l2_l1_data_count = self.simulate_l2_tile_compute_cycle_count(
                 M, N, K, data_type, mapping, pcb_module, look_up_table
             )
+            
+        def simulate_l2_tile_io_data_count(
+            self, M: int, N: int, data_type: DataType
+        ):
+            return M * N * data_type.word_size
 
         def simulate_l2_tile_io_cycle_count(
-            self, M: int, N: int, data_type: DataType, chiplet_module: Device
+            self, data_count: int, chiplet_module: Device
         ):
             return ceil(
-                M
-                * N
-                * data_type.word_size
+                data_count
                 / (
                     chiplet_module.io_module.bandwidth
                     / chiplet_module.compute_module.clock_freq
@@ -1205,6 +1216,7 @@ class Matmul(Operator):
             if M_remain > 0 and N_remain > 0:
                 M_N_tile_size[-1, -1] = M_remain * N_remain
 
+            total_data_count = 0
             total_cycle_count = 0
             previous_batch_Read_M_K = np.zeros(
                 [ceil(M / l1_tile_M), ceil(K / l1_tile_K)], dtype=bool
@@ -1311,6 +1323,8 @@ class Matmul(Operator):
                     * chiplet_module.compute_module.core.systolic_array.output_word_size
                     / chiplet_module.compute_module.l2_bandwidth_per_cycle
                 )
+                
+                total_data_count += ceil(current_batch_read_count) + ceil(previous_batch_M_N_write_count)
 
                 total_cycle_count += (
                     max(
@@ -1329,13 +1343,17 @@ class Matmul(Operator):
                 active_l1_tile_list = []
 
             # last batch's compute and write
+            total_data_count += ceil(np.sum(M_N_tile_size))
+            total_data_count *= data_type.word_size
+            
+            
             total_cycle_count += previous_batch_compute_cycle_count + ceil(
                 np.sum(previous_batch_Write_M_N * M_N_tile_size)
                 * data_type.word_size
                 / chiplet_module.compute_module.l2_bandwidth_per_cycle
             )
 
-            return total_cycle_count
+            return total_cycle_count, total_data_count
 
     class L1TileSimulator:
         def __init__(
