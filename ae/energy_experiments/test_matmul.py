@@ -7,7 +7,7 @@ import os
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-m", "--mode", type=str, default="sim", help="sim: simulation, gpu: run on GPU")
+    parser.add_argument("-m", "--mode", type=str, default="sim", help="sim: simulation, run: run on GPU")
     parser.add_argument("-d", "--device", type=str, help="device to simulate: A100, RTX4090")
     parser.add_argument("--gpu", action="store_true", help="Enable GPU")
     parser.add_argument("--simgpu", action="store_true", help="Enable simulation")
@@ -24,7 +24,7 @@ if __name__ == "__main__":
     
     print(f"Device: {device_name} {device}")
     
-    if args.mode == "gpu":
+    if args.mode == "run":
         args.gpu = True
         file_name = f'ae/energy_experiments/matmul_{device_name}_gpu.csv'
         gpu_kernel_launch_overhead = Matmul.gpu_kernel_launch_overhead()
@@ -44,6 +44,8 @@ if __name__ == "__main__":
     titile = f"Performance of Matmul with K={K}, N={N}"
     print(f"{titile}")
     
+    test_overhead = True
+    
     for M in range(5, 16):
         M = 2**M
         model = Matmul(data_type=data_type_dict["fp16"])
@@ -55,17 +57,29 @@ if __name__ == "__main__":
             if test_overhead:
                 model.gpu_kernel_launch_overhead()
                 test_overhead = False
-            latency = model.run_on_gpu()
+                
+            latency, energy = model.run_on_gpu()
+            #latency = model.run_on_gpu()
+            #energy = 0
+            
+            energy *= 1e9
+            tflops = 2 * M * N * K / latency / 1e12
+            power = (energy / 1e12) / latency
+            print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W {energy}", flush=True)
+            with open(file_name, 'a') as f:
+                f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}\n")
         if args.simgpu:
             result = model.compile_and_simulate(pcb_module=device, compile_mode="heuristic-GPU")
             latency = result[0] + 2.1e-5
             energy = result[1]
             
-        tflops = 2 * M * N * K / latency / 1e12
-        power = (energy['total'] / 1e12) / latency
-        print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power}W, {energy}", flush=True)
-        with open(file_name, 'a') as f:
-            f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power}W, {energy['total']}, {energy['memory_to_l2_transfer']}, {energy['l2_to_l1_transfer']}, {energy['l1_to_l0_transfer']}, {energy['compute']}\n")
+            tflops = 2 * M * N * K / latency / 1e12
+            power = (energy['total'] / 1e12) / latency
+            print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}", flush=True)
+            with open(file_name, 'a') as f:
+                f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy['total']}, {energy['memory_to_l2_transfer']}, {energy['l2_to_l1_transfer']}, {energy['l1_to_l0_transfer']}, {energy['compute']}\n")
+            
+        
 
     M = 8192
     print(f"Performance of Matmul with M={M}, N=K")
@@ -78,16 +92,22 @@ if __name__ == "__main__":
             Tensor([K, N]),
         )
         if args.gpu:
-            latency = model.run_on_gpu()
+            latency, energy = model.run_on_gpu()
+            energy *= 1e9
+            tflops = 2 * M * N * K / latency / 1e12
+            power = (energy / 1e12) / latency
+            print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W {energy}", flush=True)
+            with open(file_name, 'a') as f:
+                f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}\n")
         if args.simgpu:
             result = model.compile_and_simulate(pcb_module=device, compile_mode="heuristic-GPU")
             latency = result[0] + 2.1e-5
             energy = result[1]
             
-        tflops = 2 * M * N * K / latency / 1e12
-        power = (energy['total'] / 1e12) / latency
-        print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power}W, {energy}", flush=True)
-        with open(file_name, 'a') as f:
-            f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power}W, {energy['total']}, {energy['memory_to_l2_transfer']}, {energy['l2_to_l1_transfer']}, {energy['l1_to_l0_transfer']}, {energy['compute']}\n")
+            tflops = 2 * M * N * K / latency / 1e12
+            power = (energy['total'] / 1e12) / latency
+            print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}", flush=True)
+            with open(file_name, 'a') as f:
+                f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy['total']}, {energy['memory_to_l2_transfer']}, {energy['l2_to_l1_transfer']}, {energy['l1_to_l0_transfer']}, {energy['compute']}\n")
             
     print("\n")
