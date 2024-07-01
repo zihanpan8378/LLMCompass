@@ -1545,6 +1545,9 @@ class Matmul(Operator):
     def run_on_gpu(
         self,
     ):
+        pynvml.nvmlInit()
+        device = pynvml.nvmlDeviceGetHandleByIndex(0)
+        
         # import subprocess
         # subprocess.run(['nvidia-smi', '-q', '–d', 'CLOCK'])
         input1 = torch.randn(
@@ -1562,51 +1565,41 @@ class Matmul(Operator):
         latencies = []
         input1_dummy = torch.ones(4096, 4096).cuda()
         input2_dummy = torch.ones(4096, 4096).cuda()
-        
-        pynvml.nvmlInit()
-        device = pynvml.nvmlDeviceGetHandleByIndex(0)
-        
-        while True:
-            temperature = pynvml.nvmlDeviceGetTemperature(device, pynvml.NVML_TEMPERATURE_GPU)
-            if temperature <= 30:
-                break
-            print(f"Waiting for temperature {temperature}")
-            time.sleep(3)
-        
         # warmup
         for _ in range(3):
             torch.matmul(input1_dummy, input2_dummy)
             torch.cuda.synchronize()
             time.sleep(1)
-        
-        total_iterations = 0
-        start_energy = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
+
+        total_iteratinos = 0
         iterations_start = time.time()
+        start_energy = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
         while (time.time() - iterations_start) < 1:
             for _ in range(self.iterations):
+                # x = torch.matmul(input1_dummy, input2_dummy)  # flush the cache
+                # torch.cuda.synchronize()
                 start = time.time()
-                torch.matmul(input1, input2)
                 output = torch.matmul(input1, input2)
                 torch.cuda.synchronize()
                 end = time.time()
                 assert list(output.shape) == [
-                self.computational_graph.M,
-                self.computational_graph.N,
+                    self.computational_graph.M,
+                    self.computational_graph.N,
                 ]
                 latencies.append(end - start)
-            total_iterations += self.iterations
+            # time.sleep(1)
+            total_iteratinos += self.iterations
         end_energy = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
 
-        median_latency = statistics.median(latencies)
-
         self.latency_on_gpu = (
-            median_latency
+            statistics.median(latencies)
             # min(latencies)
             # - self.gpu_kernel_launch_overhead()
             # - 4e-5
             # min(latencies) - 8e-6
         )  # GPU launch kernel overhead and PyTorch overhead
-        return self.latency_on_gpu , (end_energy - start_energy) / total_iterations #end_energy[median_index] - start_energy[median_index]
+        return self.latency_on_gpu, (end_energy - start_energy) / total_iteratinos
+
 
     @staticmethod
     def gpu_kernel_launch_overhead():
