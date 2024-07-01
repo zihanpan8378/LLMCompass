@@ -62,9 +62,10 @@ if __name__ == "__main__":
             energy = result[1]
             
         tflops = 2 * M * N * K / latency / 1e12
-        print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {energy}", flush=True)
+        power = (energy['total'] / 1e12) / latency
+        print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power}W, {energy}", flush=True)
         with open(file_name, 'a') as f:
-            f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {energy['total']}, {energy['memory_to_l2_transfer']}, {energy['l2_to_l1_transfer']}, {energy['l1_to_l0_transfer']}, {energy['compute']}\n")
+            f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power}W, {energy['total']}, {energy['memory_to_l2_transfer']}, {energy['l2_to_l1_transfer']}, {energy['l1_to_l0_transfer']}, {energy['compute']}\n")
 
     M = 8192
     print(f"Performance of Matmul with M={M}, N=K")
@@ -84,8 +85,9 @@ if __name__ == "__main__":
             energy = result[1]
             
         tflops = 2 * M * N * K / latency / 1e12
-        print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {energy}", flush=True)
+        power = (energy['total'] / 1e12) / latency
+        print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power}W, {energy}", flush=True)
         with open(file_name, 'a') as f:
-            f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {energy['total']}, {energy['memory_to_l2_transfer']}, {energy['l2_to_l1_transfer']}, {energy['l1_to_l0_transfer']}, {energy['compute']}\n")
+            f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power}W, {energy['total']}, {energy['memory_to_l2_transfer']}, {energy['l2_to_l1_transfer']}, {energy['l1_to_l0_transfer']}, {energy['compute']}\n")
             
     print("\n")
