@@ -42,6 +42,7 @@ if __name__ == "__main__":
                 model.gpu_kernel_launch_overhead()
                 test_overhead = False
             latency = model.run_on_gpu()
+            file_name='matmul_RTX4090_gpu.csv'
         if args.simtpu:
             if args.roofline:
                 latency = model.roofline_model(pcb) + 110e-6

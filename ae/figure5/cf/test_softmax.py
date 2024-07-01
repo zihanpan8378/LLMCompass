@@ -42,6 +42,7 @@ if __name__ == "__main__":
             )
             if args.gpu:
                 latency = model.run_on_gpu()
+                file_name = "softmax_A100_gpu.csv"
             if args.simgpu:
                 if args.roofline:
                     latency = model.roofline_model(pcb_module=A100) + gpu_overhead
