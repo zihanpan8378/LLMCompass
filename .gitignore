@@ -3,4 +3,4 @@ SlurmOutput/
 temp/
 .vscode/
 *.ncu-rep
-ae/energy_experiments/log
+ae/energy_experiments/log/
