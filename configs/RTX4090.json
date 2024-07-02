@@ -24,8 +24,8 @@
             "core": {
                 "sublane_count": 4,
                 "systolic_array": {
-                    "array_width": 16,
-                    "array_height": 16,
+                    "array_width": 8,
+                    "array_height": 8,
                     "data_type": "fp16",
                     "mac_per_cycle": 1
                 },
