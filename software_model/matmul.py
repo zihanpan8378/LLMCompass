@@ -759,8 +759,12 @@ class Matmul(Operator):
         pcb_module: Device,
     ) -> int:
         if self.look_up_table is None:
+            look_up_table_path = f"./systolic_array_model/look_up_table_{pcb_module.compute_module.core.systolic_array.array_height}_{pcb_module.compute_module.core.systolic_array.array_width}.csv"
+            if not os.path.exists(look_up_table_path):
+                with open(look_up_table_path, "w") as f:
+                    pass
             self.look_up_table = pd.read_csv(
-                f"./systolic_array_model/look_up_table_{pcb_module.compute_module.core.systolic_array.array_height}_{pcb_module.compute_module.core.systolic_array.array_width}.csv",
+                look_up_table_path,
                 header=None,
                 names=[
                     "M",
@@ -1478,6 +1482,8 @@ class Matmul(Operator):
                 ].item()
             except KeyError:
                 # print('not found in look up table')
+                if not os.path.exists("./systolic_array_model/temp"):
+                    os.makedirs("./systolic_array_model/temp")
                 config = f"./systolic_array_model/temp/systolic_array_{os.getpid()}.cfg"
                 with open(config, "w") as f:
                     f.writelines("[general]\n")
