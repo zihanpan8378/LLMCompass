@@ -55,12 +55,11 @@ if __name__ == "__main__":
         )
         if args.gpu:
             if test_overhead:
-                model.gpu_kernel_launch_overhead()
+                overhead = model.gpu_kernel_launch_overhead()
+                print(f"Overhead: {overhead*1e3:.4f}ms", flush=True)
                 test_overhead = False
                 
             latency, energy = model.run_on_gpu()
-            #latency = model.run_on_gpu()
-            #energy = 0
             
             energy *= 1e9
             tflops = 2 * M * N * K / latency / 1e12
@@ -70,7 +69,7 @@ if __name__ == "__main__":
                 f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}\n")
         if args.simgpu:
             result = model.compile_and_simulate(pcb_module=device, compile_mode="heuristic-GPU")
-            latency = result[0] + 2.1e-5
+            latency = result[0] + gpu_overhead
             energy = result[1]
             
             tflops = 2 * M * N * K / latency / 1e12
@@ -101,7 +100,7 @@ if __name__ == "__main__":
                 f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}\n")
         if args.simgpu:
             result = model.compile_and_simulate(pcb_module=device, compile_mode="heuristic-GPU")
-            latency = result[0] + 2.1e-5
+            latency = result[0] + gpu_overhead
             energy = result[1]
             
             tflops = 2 * M * N * K / latency / 1e12
