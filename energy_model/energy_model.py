@@ -17,13 +17,13 @@ process_node_mapper = { # not real values
         'l2': 0.12,
         'l1': 0.04,
         'l0': 0.02,
-        'energy_per_flop': 0.7
+        'energy_per_flop': 1.1
     }
 }
 
 memory_node_mapper = {
     'HBM2e': {
-        'Average_Device_Power': 3.97 # Fine-Grained DRAM: Energy-Efficient DRAM for Extreme Bandwidth Systems
+        'Average_Device_Power': 3.97, # Fine-Grained DRAM: Energy-Efficient DRAM for Extreme Bandwidth Systems
         # 'DRAM_activate': 1.21,
         # 'DRAM_IO': 0.22,
         # 'DRAM_transfer': 2.54,
