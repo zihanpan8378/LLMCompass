@@ -16,11 +16,15 @@ if __name__ == "__main__":
     device_name = args.device
     if device_name == "A100":
         system = template_to_system(read_architecture_template("configs/GA100.json"))
-        
+        gpu_overhead = 2.1e-5
     elif device_name == "RTX4090":
         system = template_to_system(read_architecture_template("configs/RTX4090.json"))
+        gpu_overhead = 2.05e-5
+    elif device_name == "RTX6000Ada":
+        system = template_to_system(read_architecture_template("configs/RTX6000Ada.json"))
+        gpu_overhead = 2.22e-5
+    
     device = system.device
-    gpu_overhead = 2.1e-5
     
     print(f"Device: {device_name} {device}")
     
