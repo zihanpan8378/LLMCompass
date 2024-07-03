@@ -63,14 +63,14 @@ if __name__ == "__main__":
                 print(f"Overhead: {overhead*1e3:.4f}ms", flush=True)
                 test_overhead = False
                 
-            latency, energy = model.run_on_gpu()
+            latency, energy, grephics_freq = model.run_on_gpu()
             
             energy *= 1e9
             tflops = 2 * M * N * K / latency / 1e12
             power = (energy / 1e12) / latency
-            print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W {energy}", flush=True)
+            print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}pJ, {grephics_freq}MHz,", flush=True)
             with open(file_name, 'a') as f:
-                f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}\n")
+                f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}, {grephics_freq}\n")
         if args.simgpu:
             result = model.compile_and_simulate(pcb_module=device, compile_mode="heuristic-GPU")
             latency = result[0] + gpu_overhead
@@ -95,13 +95,13 @@ if __name__ == "__main__":
             Tensor([K, N]),
         )
         if args.gpu:
-            latency, energy = model.run_on_gpu()
+            latency, energy, grephics_freq = model.run_on_gpu()
             energy *= 1e9
             tflops = 2 * M * N * K / latency / 1e12
             power = (energy / 1e12) / latency
-            print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W {energy}", flush=True)
+            print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}pJ, {grephics_freq:.2f}MHz", flush=True)
             with open(file_name, 'a') as f:
-                f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}\n")
+                f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}, {grephics_freq:.2f}\n")
         if args.simgpu:
             result = model.compile_and_simulate(pcb_module=device, compile_mode="heuristic-GPU")
             latency = result[0] + gpu_overhead
