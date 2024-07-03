@@ -1568,7 +1568,7 @@ class Matmul(Operator):
             dtype=torch.bfloat16,
             device="cuda:0",
         )
-        latencies = []
+        
         input1_dummy = torch.ones(4096, 4096).cuda()
         input2_dummy = torch.ones(4096, 4096).cuda()
         # warmup
@@ -1577,13 +1577,14 @@ class Matmul(Operator):
             torch.cuda.synchronize()
             time.sleep(1)
 
+        latencies = []
         total_iteratinos = 0
         iterations_start = time.time()
+        graphics_freq = []
+        count = 0.5
         start_energy = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
-        while (time.time() - iterations_start) < 1:
+        while True:
             for _ in range(self.iterations):
-                # x = torch.matmul(input1_dummy, input2_dummy)  # flush the cache
-                # torch.cuda.synchronize()
                 start = time.time()
                 output = torch.matmul(input1, input2)
                 torch.cuda.synchronize()
@@ -1593,18 +1594,46 @@ class Matmul(Operator):
                     self.computational_graph.N,
                 ]
                 latencies.append(end - start)
-            # time.sleep(1)
             total_iteratinos += self.iterations
+            current_time = time.time()
+            if ((current_time - iterations_start) >= count):
+                graphics_freq.append(pynvml.nvmlDeviceGetClockInfo(device, pynvml.NVML_CLOCK_GRAPHICS))
+                count += 0.5
+            if ((current_time - iterations_start) >= 3):
+                break
         end_energy = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
+        
+        # temp_freq = []
+        # start_energy_overhead = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
+        # for _ in range(0, total_iteratinos):
+        #     temp_freq.append(pynvml.nvmlDeviceGetClockInfo(device, pynvml.NVML_CLOCK_GRAPHICS))
+        #     temp_freq.append(pynvml.nvmlDeviceGetClockInfo(device, pynvml.NVML_CLOCK_MEM))
+        # end_energy_overhead = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
+        # energy_overhead = end_energy_overhead - start_energy_overhead
+        energy_overhead = 0
+        
+        pynvml.nvmlShutdown()
+        
+        median_latency = statistics.median(latencies)
+        median_grephics_freq = []
+        median_memory_freq = []
+        
+        # temp = min(latencies, key=lambda l: abs(l - median_latency))
+        
+        # for i in range(0, len(latencies)):
+        #     if temp == latencies[i]:
+        #         median_grephics_freq.append(graphics_freq[i])
+        #         median_memory_freq.append(memory_freq[i])
 
         self.latency_on_gpu = (
-            statistics.median(latencies)
+            median_latency
             # min(latencies)
             # - self.gpu_kernel_launch_overhead()
             # - 4e-5
             # min(latencies) - 8e-6
         )  # GPU launch kernel overhead and PyTorch overhead
-        return self.latency_on_gpu, (end_energy - start_energy) / total_iteratinos
+        
+        return self.latency_on_gpu, (end_energy - start_energy - energy_overhead) / total_iteratinos, statistics.median(graphics_freq)
 
 
     @staticmethod
