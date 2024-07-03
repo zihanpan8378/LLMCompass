@@ -809,7 +809,7 @@ class Matmul(Operator):
             'memory_to_l2_transfer': 0, 
             'l2_to_l1_transfer': 0, 
             'l1_to_l0_transfer': 0, 
-            'compute': self.energy_model.compute(M * N * K)
+            'compute': self.energy_model.compute(2 * M * N * K)
         }
 
         if mapping.is_l2_double_buffering:
