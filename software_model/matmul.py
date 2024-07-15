@@ -1603,28 +1603,12 @@ class Matmul(Operator):
                 break
         end_energy = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
         
-        # temp_freq = []
-        # start_energy_overhead = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
-        # for _ in range(0, total_iteratinos):
-        #     temp_freq.append(pynvml.nvmlDeviceGetClockInfo(device, pynvml.NVML_CLOCK_GRAPHICS))
-        #     temp_freq.append(pynvml.nvmlDeviceGetClockInfo(device, pynvml.NVML_CLOCK_MEM))
-        # end_energy_overhead = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
-        # energy_overhead = end_energy_overhead - start_energy_overhead
         energy_overhead = 0
         
         pynvml.nvmlShutdown()
         
         median_latency = statistics.median(latencies)
-        median_grephics_freq = []
-        median_memory_freq = []
         
-        # temp = min(latencies, key=lambda l: abs(l - median_latency))
-        
-        # for i in range(0, len(latencies)):
-        #     if temp == latencies[i]:
-        #         median_grephics_freq.append(graphics_freq[i])
-        #         median_memory_freq.append(memory_freq[i])
-
         self.latency_on_gpu = (
             median_latency
             # min(latencies)
