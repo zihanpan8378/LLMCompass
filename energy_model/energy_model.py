@@ -17,21 +17,18 @@ process_node_mapper = { # not real values
         'l2': 0.12,
         'l1': 0.04,
         'l0': 0.02,
-        'energy_per_flop': 1.1
+        'energy_per_flop': 0.8
     }
 }
 
 memory_node_mapper = {
     'HBM2e': {
-        'Average_Device_Power': 3.97, # Fine-Grained DRAM: Energy-Efficient DRAM for Extreme Bandwidth Systems
+        'Average_Device_Power': 3.92, # Fine-Grained DRAM: Energy-Efficient DRAM for Extreme Bandwidth Systems
         # 'DRAM_activate': 1.21,
         # 'DRAM_IO': 0.22,
         # 'DRAM_transfer': 2.54,
         # 'link_distance': 9.9,
         # 'overhead': 0,
-    },
-    'GDDR5': {
-        'Average_Device_Power': 14.0 # Fine-Grained DRAM: Energy-Efficient DRAM for Extreme Bandwidth Systems
     },
     'GDDR5X': {
         'Average_Device_Power': 8.0, # https://www.micron.com/products/memory/hbm/gddr6x
