@@ -31,6 +31,7 @@ $ conda install pytorch==2.0.0 -c pytorch
 $ pip3 install matplotlib
 $ pip3 install seaborn
 $ pip3 install scipy
+$ pip3 install pynvml
 ```
 
 ## Installation
