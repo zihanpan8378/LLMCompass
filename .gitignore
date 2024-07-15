@@ -4,3 +4,4 @@ temp/
 .vscode/
 *.ncu-rep
 ae/energy_experiments/log/
+*.nsys-rep
