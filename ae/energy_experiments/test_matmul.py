@@ -23,6 +23,9 @@ if __name__ == "__main__":
     elif device_name == "RTX6000Ada":
         system = template_to_system(read_architecture_template("configs/RTX6000Ada.json"))
         gpu_overhead = 2.22e-5
+    elif device_name == "L4":
+        system = template_to_system(read_architecture_template("configs/L4.json"))
+        gpu_overhead = 2.22e-5
     
     device = system.device
     
@@ -50,7 +53,7 @@ if __name__ == "__main__":
     
     test_overhead = True
     
-    for M in range(5, 16):
+    for M in range(5, 20):
         M = 2**M
         model = Matmul(data_type=data_type_dict["fp16"])
         _ = model(
@@ -68,7 +71,7 @@ if __name__ == "__main__":
             energy *= 1e9
             tflops = 2 * M * N * K / latency / 1e12
             power = (energy / 1e12) / latency
-            print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}pJ, {grephics_freq}MHz,", flush=True)
+            print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}pJ, {grephics_freq}MHz", flush=True)
             with open(file_name, 'a') as f:
                 f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}, {grephics_freq}\n")
         if args.simgpu:
@@ -86,7 +89,7 @@ if __name__ == "__main__":
 
     M = 8192
     print(f"Performance of Matmul with M={M}, N=K")
-    for K in range(5, 16):
+    for K in range(5, 20):
         K = 2**K
         N = K
         model = Matmul(data_type=data_type_dict["fp16"])
