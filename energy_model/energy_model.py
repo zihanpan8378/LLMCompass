@@ -14,9 +14,9 @@ process_node_mapper = { # not real values
         'energy_per_flop': 1.1 # Trends in Energy Estimates for Computing in AI/Machine Learning Accelerators, Supercomputers, and Compute-Intensive Applications
     },
     '4nm': {
-        'l2': 0.12,
-        'l1': 0.04,
-        'l0': 0.02,
+        'l2': 0.225,
+        'l1': 0.075,
+        'l0': 0.038,
         'energy_per_flop': 0.8
     }
 }
