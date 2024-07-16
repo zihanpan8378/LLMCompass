@@ -53,7 +53,7 @@ if __name__ == "__main__":
     
     test_overhead = True
     
-    for M in range(5, 20):
+    for M in range(5, 16):
         M = 2**M
         model = Matmul(data_type=data_type_dict["fp16"])
         _ = model(
@@ -65,13 +65,13 @@ if __name__ == "__main__":
                 overhead = model.gpu_kernel_launch_overhead()
                 print(f"Overhead: {overhead*1e3:.4f}ms", flush=True)
                 test_overhead = False
+                gpu_overhead = overhead
                 
-            latency, energy, grephics_freq = model.run_on_gpu()
-            
+            latency, latency_average, energy, grephics_freq = model.run_on_gpu()
             energy *= 1e9
             tflops = 2 * M * N * K / latency / 1e12
             power = (energy / 1e12) / latency
-            print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}pJ, {grephics_freq}MHz", flush=True)
+            print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {latency_average*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}pJ, {grephics_freq}MHz", flush=True)
             with open(file_name, 'a') as f:
                 f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}, {grephics_freq}\n")
         if args.simgpu:
@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
     M = 8192
     print(f"Performance of Matmul with M={M}, N=K")
-    for K in range(5, 20):
+    for K in range(5, 16):
         K = 2**K
         N = K
         model = Matmul(data_type=data_type_dict["fp16"])

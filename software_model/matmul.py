@@ -1329,6 +1329,16 @@ class Matmul(Operator):
                     / chiplet_module.compute_module.l2_bandwidth_per_cycle
                 )
                 
+                # tmp_batch_read_count = (
+                #     np.sum(current_batch_Read_M_K * M_K_tile_size)
+                #     + np.sum(current_batch_Read_K_N * K_N_tile_size)
+                #     + np.sum(current_batch_Read_M_N * M_N_tile_size)
+                # )
+                
+                # tmp_batch_write_count = (
+                #     np.sum(previous_batch_Write_M_N * M_N_tile_size)
+                # )
+                
                 total_data_count += ceil(current_batch_read_count) + ceil(previous_batch_M_N_write_count)
 
                 total_cycle_count += (
@@ -1578,7 +1588,7 @@ class Matmul(Operator):
             time.sleep(1)
 
         latencies = []
-        total_iteratinos = 0
+        total_iterations = 0
         iterations_start = time.time()
         graphics_freq = []
         count = 0.5
@@ -1594,7 +1604,7 @@ class Matmul(Operator):
                     self.computational_graph.N,
                 ]
                 latencies.append(end - start)
-            total_iteratinos += self.iterations
+            total_iterations += self.iterations
             current_time = time.time()
             if ((current_time - iterations_start) >= count):
                 graphics_freq.append(pynvml.nvmlDeviceGetClockInfo(device, pynvml.NVML_CLOCK_GRAPHICS))
@@ -1603,11 +1613,10 @@ class Matmul(Operator):
                 break
         end_energy = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
         
-        energy_overhead = 0
-        
         pynvml.nvmlShutdown()
         
         median_latency = statistics.median(latencies)
+        average_latency = statistics.mean(latencies)
         
         self.latency_on_gpu = (
             median_latency
@@ -1617,7 +1626,7 @@ class Matmul(Operator):
             # min(latencies) - 8e-6
         )  # GPU launch kernel overhead and PyTorch overhead
         
-        return self.latency_on_gpu, (end_energy - start_energy - energy_overhead) / total_iteratinos, statistics.median(graphics_freq)
+        return median_latency, average_latency, (end_energy - start_energy) / total_iterations, statistics.mean(graphics_freq)
 
 
     @staticmethod
@@ -1634,6 +1643,6 @@ class Matmul(Operator):
             end = time.time()
             latencies.append(end - start)
         avg_overhead = statistics.median(latencies)
-        print("GPU kernel launch overhead: ", avg_overhead * 1e3, "ms")
-        print(latencies)
+        #print("GPU kernel launch overhead: ", avg_overhead * 1e3, "ms")
+        #print(latencies)
         return avg_overhead
