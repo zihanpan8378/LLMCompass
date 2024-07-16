@@ -50,7 +50,7 @@ if __name__ == "__main__":
     test_overhead = True
     
     for M in range(5, 16):
-        M = 2**M * 1024
+        M = 2**M
         model = ComputeIntensiveKernel(data_type=data_type_dict["fp16"])
         _ = model(M)
         if args.gpu:

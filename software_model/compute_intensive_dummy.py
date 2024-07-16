@@ -26,11 +26,14 @@ class ComputeIntensiveKernel(Operator):
         pynvml.nvmlInit()
         device = pynvml.nvmlDeviceGetHandleByIndex(0)
         
+        l2_cache_size = 96 * 1024 * 1024
+        
         input = torch.randn(
-            1,
+            l2_cache_size // 2,
             dtype=torch.bfloat16,
             device="cuda:0",
         )
+        print(f"Input shape: {input.shape}")
         
         latencies = []
         iterations = 0
@@ -40,8 +43,8 @@ class ComputeIntensiveKernel(Operator):
         start_energy = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
         while True:
             start = time.time()
-            for _ in range(self.op_num):
-                input = input + 0.0001
+            for i in range(self.op_num):
+                _ = input.sum()
             end = time.time()
             latencies.append(end - start)
             iterations += 1
