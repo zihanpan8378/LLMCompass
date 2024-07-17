@@ -34,6 +34,8 @@ class ComputeIntensiveKernel(Operator):
             device="cuda:0",
         )
         
+        _ = input.sum()
+        
         latencies = []
         iterations = 0
         iterations_start = time.time()
