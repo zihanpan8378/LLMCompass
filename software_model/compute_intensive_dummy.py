@@ -26,7 +26,7 @@ class ComputeIntensiveKernel(Operator):
         pynvml.nvmlInit()
         device = pynvml.nvmlDeviceGetHandleByIndex(0)
         
-        l2_cache_size = 96 * 1024 * 1024
+        l2_cache_size = self.op_num * 1024 * 1024
         
         input = torch.randn(
             l2_cache_size // 2,
@@ -42,7 +42,7 @@ class ComputeIntensiveKernel(Operator):
         start_energy = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
         while True:
             start = time.time()
-            for i in range(self.op_num):
+            for i in range(2**5):
                 _ = input.sum()
             end = time.time()
             latencies.append(end - start)
@@ -51,7 +51,7 @@ class ComputeIntensiveKernel(Operator):
             if ((current_time - iterations_start) >= count):
                 graphics_freq.append(pynvml.nvmlDeviceGetClockInfo(device, pynvml.NVML_CLOCK_GRAPHICS))
                 count += 0.5
-            if ((current_time - iterations_start) >= 10):
+            if ((current_time - iterations_start) >= 3):
                 break
         end_energy = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
         
