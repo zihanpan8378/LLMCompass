@@ -14,7 +14,7 @@ process_node_mapper = { # not real values
         'energy_per_flop': 1.1 # Trends in Energy Estimates for Computing in AI/Machine Learning Accelerators, Supercomputers, and Compute-Intensive Applications
     },
     '4nm': {
-        'l2': 0.225,
+        'l2': 5, # tuning with l2 cache test with RTX6000Ada # 3.5 for L4
         'l1': 0.075,
         'l0': 0.038,
         'energy_per_flop': 0.8
@@ -34,7 +34,8 @@ memory_node_mapper = {
         'Average_Device_Power': 8.0, # https://www.micron.com/products/memory/hbm/gddr6x
     },
     'GDDR6': {
-        'Average_Device_Power': 7.5, # https://www.micron.com/products/memory/hbm/gddr6x
+        'Average_Device_Power': 15, # tuning with memory dummy test with RTX6000Ada # 14 for L4
+        # 'Average_Device_Power': 7.5, # https://www.micron.com/products/memory/hbm/gddr6x
     },
     'GDDR6X': {
         'Average_Device_Power': 7.25,  # https://www.micron.com/products/memory/hbm/gddr6x
