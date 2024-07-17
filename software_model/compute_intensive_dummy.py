@@ -33,7 +33,6 @@ class ComputeIntensiveKernel(Operator):
             dtype=torch.bfloat16,
             device="cuda:0",
         )
-        print(f"Input shape: {input.shape}")
         
         latencies = []
         iterations = 0
@@ -52,7 +51,7 @@ class ComputeIntensiveKernel(Operator):
             if ((current_time - iterations_start) >= count):
                 graphics_freq.append(pynvml.nvmlDeviceGetClockInfo(device, pynvml.NVML_CLOCK_GRAPHICS))
                 count += 0.5
-            if ((current_time - iterations_start) >= 3):
+            if ((current_time - iterations_start) >= 10):
                 break
         end_energy = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
         

@@ -61,11 +61,11 @@ if __name__ == "__main__":
             #     gpu_overhead = overhead
             latency, energy, grephics_freq = model.run_on_gpu()
             energy *= 1e9
-            tflops = M / latency / 1e12
+            flops = M / latency
             power = (energy / 1e12) / latency
-            print(f"{M}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}pJ, {grephics_freq}MHz", flush=True)
+            print(f"{M}, {latency*1e3:.4f}ms, {flops:.4f}flops, {power:.2f}W, {energy}pJ, {grephics_freq}MHz", flush=True)
             with open(file_name, 'a') as f:
-                f.write(f"{M}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}, {grephics_freq}\n")
+                f.write(f"{M}, {latency*1e3:.4f}ms, {flops:.4f}flops, {power:.2f}W, {energy}, {grephics_freq}\n")
         if args.simgpu:
             result = model.compile_and_simulate(pcb_module=device, compile_mode="heuristic-GPU")
             latency = result[0] + gpu_overhead
