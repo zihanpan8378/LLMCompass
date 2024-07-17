@@ -1561,9 +1561,6 @@ class Matmul(Operator):
     def run_on_gpu(
         self,
     ):
-        pynvml.nvmlInit()
-        device = pynvml.nvmlDeviceGetHandleByIndex(0)
-        
         # import subprocess
         # subprocess.run(['nvidia-smi', '-q', '–d', 'CLOCK'])
         input1 = torch.randn(
@@ -1581,11 +1578,15 @@ class Matmul(Operator):
         
         input1_dummy = torch.ones(4096, 4096).cuda()
         input2_dummy = torch.ones(4096, 4096).cuda()
+        
         # warmup
         for _ in range(3):
             torch.matmul(input1_dummy, input2_dummy)
             torch.cuda.synchronize()
             time.sleep(1)
+
+        pynvml.nvmlInit()
+        device = pynvml.nvmlDeviceGetHandleByIndex(0)
 
         latencies = []
         total_iterations = 0
@@ -1618,13 +1619,7 @@ class Matmul(Operator):
         median_latency = statistics.median(latencies)
         average_latency = statistics.mean(latencies)
         
-        self.latency_on_gpu = (
-            median_latency
-            # min(latencies)
-            # - self.gpu_kernel_launch_overhead()
-            # - 4e-5
-            # min(latencies) - 8e-6
-        )  # GPU launch kernel overhead and PyTorch overhead
+        self.latency_on_gpu = median_latency
         
         return median_latency, average_latency, (end_energy - start_energy) / total_iterations, statistics.mean(graphics_freq)
 
