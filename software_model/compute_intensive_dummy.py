@@ -34,7 +34,10 @@ class ComputeIntensiveKernel(Operator):
             device="cuda:0",
         )
         
+        
         _ = input.sum()
+        
+        print(f"Input shape: {input.shape}")
         
         latencies = []
         iterations = 0
