@@ -263,7 +263,7 @@ class Softmax(Operator):
                 l1_tile_cycle_count
                 + log2(ceil(N / l1_tile_N)) * l1_tile.reduction_cycle_count
             )
-            return total_cycle_count, l1_tile.read_data_count + l1_tile.write_data_count
+            return total_cycle_count, l1_tile_cycle_count * (l1_tile.read_data_count + l1_tile.write_data_count)
 
 
     class L1TileSimulator:
