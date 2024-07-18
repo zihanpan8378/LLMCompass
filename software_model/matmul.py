@@ -285,7 +285,6 @@ class Matmul(Operator):
         N = self.computational_graph.N
         K = self.computational_graph.K
         
-        data_type = self.data_type
         self.energy_consumption = 0
         
         self.energy_model = EnergyModel(
@@ -1019,7 +1018,11 @@ class Matmul(Operator):
             
         energy_consumption['memory_to_l2_transfer'] = self.energy_model.transfer_memory_l2(total_memory_to_l2_data_count * 8)
         energy_consumption['l2_to_l1_transfer'] = self.energy_model.transfer_l2_l1(total_l2_to_l1_data_count * 8)
-        energy_consumption['total'] = energy_consumption['memory_to_l2_transfer'] + energy_consumption['l2_to_l1_transfer'] + energy_consumption['compute']
+        energy_consumption['total'] = (
+            energy_consumption['memory_to_l2_transfer'] + 
+            energy_consumption['l2_to_l1_transfer'] + 
+            energy_consumption['compute']
+        )
 
         return total_cycle_count, energy_consumption
         #+ ceil(
