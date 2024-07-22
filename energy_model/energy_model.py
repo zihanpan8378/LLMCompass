@@ -38,7 +38,7 @@ memory_node_mapper = {
         # 'Average_Device_Power': 7.5, # https://www.micron.com/products/memory/hbm/gddr6x
     },
     'GDDR6X': {
-        'Average_Device_Power': 7.25,  # https://www.micron.com/products/memory/hbm/gddr6x
+        'Average_Device_Power': 11,  # https://www.micron.com/products/memory/hbm/gddr6x
         # 'Average_Device_Power': 6, # https://my.micron.com/products/memory/graphics-memory
     }
 }
