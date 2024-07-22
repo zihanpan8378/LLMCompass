@@ -49,8 +49,7 @@ if __name__ == "__main__":
     
     test_overhead = True
     
-    for M in range(0, 193):
-        # M = 2**M
+    for M in range(8, 2048 + 1, 8):
         model = ComputeIntensiveKernel(data_type=data_type_dict["fp16"])
         _ = model(M)
         if args.gpu:
@@ -59,13 +58,13 @@ if __name__ == "__main__":
             #     print(f"Overhead: {overhead*1e3:.4f}ms", flush=True)
             #     test_overhead = False
             #     gpu_overhead = overhead
-            latency, energy, grephics_freq = model.run_on_gpu()
+            latency, energy, grephics_freq, gpu_utilization, num_flop = model.run_on_gpu()
             energy *= 1e9
             flops = M / latency
             power = (energy / 1e12) / latency
-            print(f"{M}, {latency*1e3:.4f}ms, {flops:.4f}flops, {power:.2f}W, {energy}pJ, {grephics_freq}MHz", flush=True)
+            print(f"{M}, {latency*1e3:.4f}ms, {flops:.4f}flops, {power:.2f}W, {energy}pJ, {grephics_freq}MHz, {gpu_utilization}, {num_flop}", flush=True)
             with open(file_name, 'a') as f:
-                f.write(f"{M}, {latency*1e3:.4f}ms, {flops:.4f}flops, {power:.2f}W, {energy}, {grephics_freq}\n")
+                f.write(f"{M}, {latency*1e3:.4f}ms, {flops:.4f}flops, {power:.2f}W, {energy}, {grephics_freq}, {gpu_utilization}, {num_flop}\n")
         if args.simgpu:
             result = model.compile_and_simulate(pcb_module=device, compile_mode="heuristic-GPU")
             latency = result[0] + gpu_overhead
