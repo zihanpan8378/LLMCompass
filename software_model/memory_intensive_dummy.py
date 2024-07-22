@@ -19,21 +19,24 @@ class MemoryIntensiveKernel(Operator):
     def __init__(self, data_type: DataType):
         super().__init__(0, 0, 0, 0, data_type)
         
-    def __call__(self, M: int):
-        self.M = M
+    def __call__(self, size: int):
+        self.size = size
         
     def run_on_gpu(self):
         pynvml.nvmlInit()
         device = pynvml.nvmlDeviceGetHandleByIndex(0)
         
-        size = self.M * 256 * 512
+        input_size = self.size * 1024 * 1024 # input_size in MB
         
-        input1 = torch.randn(
-            size,
+        input = torch.randn(
+            input_size // 2,
             dtype=torch.bfloat16,
             device="cuda:0",
         )
-        input2 = torch.empty_like(input1, device="cuda:0")
+        
+        _ = input.sum()
+        
+        print(f"Input shape: {input.shape}")
         
         latencies = []
         iterations = 0
@@ -43,9 +46,8 @@ class MemoryIntensiveKernel(Operator):
         start_energy = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
         while True:
             start = time.time()
-            # input2.copy_(input1)
-            input2 = torch.zeros_like(input2, device="cuda:0")
-            # input2 = torch.ones_like(input2, device="cuda:0")
+            for i in range(2**5):
+                _ = input.sum()
             end = time.time()
             latencies.append(end - start)
             iterations += 1
@@ -53,13 +55,13 @@ class MemoryIntensiveKernel(Operator):
             if ((current_time - iterations_start) >= count):
                 graphics_freq.append(pynvml.nvmlDeviceGetClockInfo(device, pynvml.NVML_CLOCK_GRAPHICS))
                 count += 0.5
-            if ((current_time - iterations_start) >= 10):
+            if ((current_time - iterations_start) >= 3):
                 break
         end_energy = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
         
         pynvml.nvmlShutdown()
         
-        median_latency = statistics.median(latencies)
-        median_graphics_freq = statistics.median(graphics_freq)
+        mean_latency = statistics.median(latencies)
+        mean_graphics_freq = statistics.mean(graphics_freq)
         
-        return median_latency, (end_energy - start_energy) / iterations, median_graphics_freq
+        return mean_latency, (end_energy - start_energy) / iterations, mean_graphics_freq
