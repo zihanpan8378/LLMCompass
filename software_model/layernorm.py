@@ -3,11 +3,13 @@ from typing import List, Tuple
 from hardware_model.device import Device
 from software_model.operators import Operator
 from software_model.utils import Tensor, DataType
+from energy_model.energy_model import EnergyModel
 from math import ceil, log2, log
 import time
 import statistics
 import numpy as np
 import torch
+import pynvml
 
 
 @torch.compile
@@ -78,6 +80,13 @@ class LayerNorm(Operator):
         )
         min_cycle_count = float("inf")
         best_mapping = None
+        
+        self.energy_consumption = 0
+        self.energy_model = EnergyModel(
+            process_node=pcb_module.compute_module.process_node,
+            memory_node=pcb_module.memory_module.memory_node
+        )
+        
         M = self.computational_graph.M
         N = self.computational_graph.N
         data_type = self.computational_graph.data_type
@@ -114,16 +123,19 @@ class LayerNorm(Operator):
             l1_tile_M,
             l1_tile_N,
         )
-        cycle_count = self.simulate(self.computational_graph, mapping, pcb_module)
+        cycle_count, energy_consumption = self.simulate(
+            self.computational_graph, mapping, pcb_module
+        )
         if cycle_count < min_cycle_count:
             min_cycle_count = cycle_count
             best_mapping = mapping
+            self.energy_consumption = energy_consumption
         self.best_mapping = best_mapping
         self.best_cycle_count = min_cycle_count
         self.best_latency = min_cycle_count / pcb_module.compute_module.clock_freq
         self.latency = self.best_latency
         # self.best_mapping.display()
-        return self.latency
+        return self.latency, self.energy_consumption
 
     def simulate(
         self,
@@ -135,6 +147,13 @@ class LayerNorm(Operator):
         N = computational_graph.N
         data_type = computational_graph.data_type
         l2_tile_M = mapping.l2_tile_M
+        
+        energy_consumption = {
+            'memory_to_l2_transfer': 0, 
+            'l2_to_l1_transfer': 0, 
+            'l1_to_l0_transfer': 0, 
+            'compute': 0
+        }
 
         M_l2_t = M // l2_tile_M
         M_remain = M % l2_tile_M
@@ -158,13 +177,31 @@ class LayerNorm(Operator):
                 pcb_module,
             )
 
+        total_compute_flop_count = 0
+        total_memory_to_l2_data_count = 0
+        total_l2_to_l1_data_count = 0
         total_cycle_count = 0
         l2_tile_count = ceil(M / l2_tile_M)
         for m in range(l2_tile_count):
+            total_compute_flop_count += l2_tiles[m].compute_flop_count
+            total_memory_to_l2_data_count += l2_tiles[m].read_data_count
+            total_memory_to_l2_data_count += l2_tiles[m].write_data_count
+            total_l2_to_l1_data_count += l2_tiles[m].l2_l1_data_count
+
             total_cycle_count += l2_tiles[m].read_cycle_count
             total_cycle_count += l2_tiles[m].compute_cycle_count
             total_cycle_count += l2_tiles[m].write_cycle_count
-        return total_cycle_count
+            
+        energy_consumption['compute'] = self.energy_model.compute(total_compute_flop_count)
+        energy_consumption['memory_to_l2_transfer'] = self.energy_model.transfer_memory_l2(total_memory_to_l2_data_count * 8)
+        energy_consumption['l2_to_l1_transfer'] = self.energy_model.transfer_l2_l1(total_l2_to_l1_data_count * 8)
+        energy_consumption['total'] = (
+            energy_consumption['memory_to_l2_transfer'] + 
+            energy_consumption['l2_to_l1_transfer'] + 
+            energy_consumption['compute']
+        )
+            
+        return total_cycle_count, energy_consumption
 
     class L2TileSimulator:
         def __init__(
@@ -177,13 +214,13 @@ class LayerNorm(Operator):
         ):
             self.M = M
             self.N = N
-            self.read_cycle_count = self.simulate_l2_tile_io_cycle_count(
+            self.read_cycle_count, self.read_data_count = self.simulate_l2_tile_io_cycle_count(
                 M, N, data_type, pcb_module
             )
-            self.write_cycle_count = self.simulate_l2_tile_io_cycle_count(
+            self.write_cycle_count, self.write_data_count = self.simulate_l2_tile_io_cycle_count(
                 M, N, data_type, pcb_module
             )
-            self.compute_cycle_count = self.simulate_l2_tile_compute_cycle_count(
+            self.compute_cycle_count, self.l2_l1_data_count, self.compute_flop_count = self.simulate_l2_tile_compute_cycle_count(
                 M, N, data_type, mapping, pcb_module
             )
 
@@ -198,7 +235,7 @@ class LayerNorm(Operator):
                     chiplet_module.io_module.bandwidth
                     / chiplet_module.compute_module.clock_freq
                 )
-            )
+            ), M * N * data_type.word_size
 
         def simulate_l2_tile_compute_cycle_count(
             self,
@@ -230,7 +267,7 @@ class LayerNorm(Operator):
                 l1_tile_cycle_count
                 + (ceil(N / l1_tile_N) - 1) * (l1_tile.reduction_cycle_count)
             )
-            return total_cycle_count
+            return total_cycle_count, l1_tile_count * (l1_tile.read_data_count + l1_tile.write_data_count), l1_tile_count * l1_tile.compute_flop_count
 
     class L1TileSimulator:
         def __init__(
@@ -243,13 +280,13 @@ class LayerNorm(Operator):
         ):
             self.M = M
             self.N = N
-            self.read_cycle_count = self.simulate_l1_tile_io_cycle_count(
+            self.read_cycle_count, self.read_data_count = self.simulate_l1_tile_io_cycle_count(
                 M, N, data_type, pcb_module
             )
-            self.compute_cycle_count = self.simulate_l1_tile_compute_cycle_count(
+            self.compute_cycle_count, self.compute_flop_count = self.simulate_l1_tile_compute_cycle_count(
                 M, N, data_type, mapping, pcb_module
             )
-            self.write_cycle_count = self.simulate_l1_tile_io_cycle_count(
+            self.write_cycle_count, self.write_data_count = self.simulate_l1_tile_io_cycle_count(
                 M, N, data_type, pcb_module
             )
             self.reduction_cycle_count = (
@@ -274,7 +311,7 @@ class LayerNorm(Operator):
                 * N
                 * data_type.word_size
                 / (pcb_module.compute_module.l2_bandwidth_per_cycle)
-            )
+            ), M * N * data_type.word_size
 
         def simulate_l1_tile_compute_cycle_count(
             self,
@@ -326,8 +363,12 @@ class LayerNorm(Operator):
                 )
                 * 4
             )  # division is heavy
+            
+            total_flop_count = (
+                M*N + M*N*2 + M*N*4
+            )
 
-            return total_cycle_count
+            return total_cycle_count, total_flop_count
 
     def run_on_gpu(self):
         # import torch
@@ -340,18 +381,40 @@ class LayerNorm(Operator):
         # warmup
         for _ in range(3):
             _ = layernorm_gpu(input)
-
             torch.cuda.synchronize()
-        for _ in range(self.iterations):
-            start = time.time()
-            output = layernorm_gpu(input)
-            torch.cuda.synchronize()
-            end = time.time()
-            assert output.shape == input.shape
-            latencies.append(end - start)
+            
+        pynvml.nvmlInit()
+        device = pynvml.nvmlDeviceGetHandleByIndex(0)    
+        
+        latencies = []
+        total_iterations = 0
+        iterations_start = time.time()
+        graphics_freq = []
+        count = 0.5
+        start_energy = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
+        while True:
+            for _ in range(self.iterations):
+                start = time.time()
+                output = layernorm_gpu(input)
+                torch.cuda.synchronize()
+                end = time.time()
+                assert output.shape == input.shape
+                latencies.append(end - start)
+            total_iterations += self.iterations
+            current_time = time.time()
+            if ((current_time - iterations_start) >= count):
+                graphics_freq.append(pynvml.nvmlDeviceGetClockInfo(device, pynvml.NVML_CLOCK_GRAPHICS))
+                count += 0.5
+            if ((current_time - iterations_start) >= 3):
+                break
+        end_energy = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
+        pynvml.nvmlShutdown()
+        
+        median_latency = statistics.median(latencies)
+        
         # print(latencies)
-        self.latency_on_gpu = statistics.median(latencies)
-        return self.latency_on_gpu
+        self.latency_on_gpu = median_latency
+        return median_latency, (end_energy - start_energy) / total_iterations, statistics.mean(graphics_freq)
 
     @staticmethod
     def gpu_kernel_launch_overhead():

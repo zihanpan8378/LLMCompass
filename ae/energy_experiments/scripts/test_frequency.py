@@ -9,7 +9,7 @@ import time
 
 def set_gpu_frequency(freq):
     try:
-        subprocess.run(["sudo", "nvidia-smi", "-ac", f"{9501},{freq}"], check=True)
+        subprocess.run(["sudo", "nvidia-smi", "-ac", f"{5001},{freq}"], check=True)
     except subprocess.CalledProcessError as e:
         print(f"Failed to set GPU frequency: {e}")
 
@@ -61,13 +61,13 @@ if __name__ == "__main__":
             f.write('')
 
     start_freq = 210
-    end_freq = 300
+    end_freq = 2505
     step = 45
 
 
     K = 12288
     N = K
-    M = 64
+    M = 1024
     titile = f"Performance of Matmul with K={K}, N={N}, M={M}"
     print(f"{titile}")
     

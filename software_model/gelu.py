@@ -3,11 +3,13 @@ from typing import List, Tuple
 from hardware_model.device import Device
 from software_model.operators import Operator
 from software_model.utils import Tensor, DataType
+from energy_model.energy_model import EnergyModel
 from math import ceil, log2, log
 import time
 import statistics
 import numpy as np
 import torch
+import pynvml
 
 
 @torch.compile
@@ -61,6 +63,11 @@ class GeLU(Operator):
             self.data_type = data_type
 
     def compile_and_simulate(self, pcb_module: Device, compile_mode: str):
+        self.energy_model = EnergyModel(
+            process_node=pcb_module.compute_module.process_node,
+            memory_node=pcb_module.memory_module.memory_node
+        )
+        
         self.computational_graph.data_type = (
             pcb_module.compute_module.core.vector_unit.data_type
         )
@@ -87,8 +94,20 @@ class GeLU(Operator):
             / pcb_module.compute_module.core_count
             / pcb_module.compute_module.clock_freq
         )
+        
+        energy_consumption = {
+            'memory_to_l2_transfer': 0, 
+            'l2_to_l1_transfer': 0, 
+            'l1_to_l0_transfer': 0, 
+            'compute': 0
+        }
+        energy_consumption['compute'] = self.energy_model.compute(total_flop_count)
+        energy_consumption['memory_to_l2_transfer'] = self.energy_model.transfer_memory_l2(total_io_count * 8)
+        energy_consumption['l2_to_l1_transfer'] = self.energy_model.transfer_l2_l1(total_io_count * 8)
+        energy_consumption['total'] = sum(energy_consumption.values())
+        self.energy_consumption = energy_consumption
 
-        return max(compute_latency, io_latency)
+        return max(compute_latency, io_latency), self.energy_consumption
 
     def run_on_gpu(self):
         assert self.shape is not None
@@ -99,16 +118,38 @@ class GeLU(Operator):
         for _ in range(3):
             _ = gelu_gpu(input)
             torch.cuda.synchronize()
-        for _ in range(self.iterations):
-            start = time.time()
-            output = gelu_gpu(input)
-            torch.cuda.synchronize()
-            end = time.time()
-            assert output.shape == input.shape
-            latencies.append(end - start)
-        # print(latencies)
-        self.latency_on_gpu = statistics.median(latencies)
-        return self.latency_on_gpu
+            
+        pynvml.nvmlInit()
+        device = pynvml.nvmlDeviceGetHandleByIndex(0)    
+        
+        latencies = []
+        total_iterations = 0
+        iterations_start = time.time()
+        graphics_freq = []
+        count = 0.5
+        start_energy = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
+        while True:
+            for _ in range(self.iterations):
+                start = time.time()
+                output = gelu_gpu(input)
+                torch.cuda.synchronize()
+                end = time.time()
+                assert output.shape == input.shape
+                latencies.append(end - start)
+            total_iterations += self.iterations
+            current_time = time.time()
+            if ((current_time - iterations_start) >= count):
+                graphics_freq.append(pynvml.nvmlDeviceGetClockInfo(device, pynvml.NVML_CLOCK_GRAPHICS))
+                count += 0.5
+            if ((current_time - iterations_start) >= 3):
+                break
+        end_energy = pynvml.nvmlDeviceGetTotalEnergyConsumption(device)
+        pynvml.nvmlShutdown()
+        
+        median_latency = statistics.median(latencies)
+        
+        self.latency_on_gpu = median_latency
+        return median_latency, (end_energy - start_energy) / total_iterations, statistics.mean(graphics_freq)
 
     @staticmethod
     def gpu_kernel_launch_overhead():

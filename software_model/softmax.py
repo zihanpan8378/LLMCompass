@@ -142,7 +142,7 @@ class Softmax(Operator):
             'memory_to_l2_transfer': 0, 
             'l2_to_l1_transfer': 0, 
             'l1_to_l0_transfer': 0, 
-            'compute': self.energy_model.compute(M*N + M*(N-1) + M*N)
+            'compute': 0
         }
 
         if mapping.is_l2_double_buffering:
@@ -177,18 +177,23 @@ class Softmax(Operator):
                 pcb_module,
             )
 
+        total_compute_flop_count = 0
         total_memory_to_l2_data_count = 0
         total_l2_to_l1_data_count = 0
         total_cycle_count = 0
         l2_tile_count = ceil(M / l2_tile_M)
         for m in range(l2_tile_count):
+            total_compute_flop_count += l2_tiles[m].compute_flop_count
             total_memory_to_l2_data_count += l2_tiles[m].read_data_count
+            total_memory_to_l2_data_count += l2_tiles[m].write_data_count
+            total_l2_to_l1_data_count += l2_tiles[m].l2_l1_data_count
+            
             total_cycle_count += l2_tiles[m].read_cycle_count
             total_cycle_count += l2_tiles[m].compute_cycle_count
-            total_memory_to_l2_data_count += l2_tiles[m].write_data_count
             total_cycle_count += l2_tiles[m].write_cycle_count
-            total_l2_to_l1_data_count += l2_tiles[m].l2_l1_data_count
+            
 
+        energy_consumption['compute'] = self.energy_model.compute(total_compute_flop_count)
         energy_consumption['memory_to_l2_transfer'] = self.energy_model.transfer_memory_l2(total_memory_to_l2_data_count * 8)
         energy_consumption['l2_to_l1_transfer'] = self.energy_model.transfer_l2_l1(total_l2_to_l1_data_count * 8)
         energy_consumption['total'] = (
@@ -216,7 +221,7 @@ class Softmax(Operator):
             self.write_cycle_count, self.write_data_count = self.simulate_l2_tile_io_cycle_count(
                 M, N, data_type, pcb_module
             )
-            self.compute_cycle_count, self.l2_l1_data_count = self.simulate_l2_tile_compute_cycle_count(
+            self.compute_cycle_count, self.l2_l1_data_count, self.compute_flop_count = self.simulate_l2_tile_compute_cycle_count(
                 M, N, data_type, mapping, pcb_module
             )
 
@@ -263,7 +268,7 @@ class Softmax(Operator):
                 l1_tile_cycle_count
                 + log2(ceil(N / l1_tile_N)) * l1_tile.reduction_cycle_count
             )
-            return total_cycle_count, l1_tile_cycle_count * (l1_tile.read_data_count + l1_tile.write_data_count)
+            return total_cycle_count, l1_tile_count * (l1_tile.read_data_count + l1_tile.write_data_count), l1_tile_count * l1_tile.compute_flop_count
 
 
     class L1TileSimulator:
@@ -283,7 +288,7 @@ class Softmax(Operator):
             self.read_cycle_count, self.read_data_count = self.simulate_l1_tile_io_cycle_count(
                 M, N, data_type, pcb_module
             )
-            self.compute_cycle_count = self.simulate_l1_tile_compute_cycle_count(
+            self.compute_cycle_count, self.compute_flop_count = self.simulate_l1_tile_compute_cycle_count(
                 M, N, data_type, mapping, pcb_module
             )
             self.write_cycle_count, self.write_data_count = self.simulate_l1_tile_io_cycle_count(
@@ -324,7 +329,7 @@ class Softmax(Operator):
             return ceil(
                 total_flop_count
                 / pcb_module.compute_module.core.vector_unit.total_vector_flops_per_cycle
-            )
+            ), total_flop_count
 
     def run_on_gpu(self):
         assert self.shape is not None
@@ -363,10 +368,9 @@ class Softmax(Operator):
         pynvml.nvmlShutdown()
         
         median_latency = statistics.median(latencies)
-        average_latency = statistics.mean(latencies)
             
         self.latency_on_gpu = median_latency
-        return median_latency, average_latency, (end_energy - start_energy) / total_iterations, statistics.mean(graphics_freq)
+        return median_latency, (end_energy - start_energy) / total_iterations, statistics.mean(graphics_freq)
 
     @staticmethod
     def gpu_kernel_launch_overhead():

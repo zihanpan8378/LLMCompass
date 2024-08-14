@@ -115,5 +115,25 @@ if __name__ == "__main__":
             print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}", flush=True)
             with open(file_name, 'a') as f:
                 f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy['total']}, {energy['memory_to_l2_transfer']}, {energy['l2_to_l1_transfer']}, {energy['l1_to_l0_transfer']}, {energy['compute']}\n")
+ 
+    # M = 1024
+    # N = 1024
+    # for K in range(8, 1024 + 1, 8):
+    #     model = Matmul(data_type=data_type_dict["fp16"])
+    #     _ = model(
+    #         Tensor([M, K]),
+    #         Tensor([K, N]),
+    #     )
+    #     result = model.compile_and_simulate(pcb_module=device, compile_mode="heuristic-GPU")
+    #     latency = result[0] + gpu_overhead
+    #     energy = result[1]
+        
+    #     tflops = 2 * M * N * K / latency / 1e12
+    #     power = (energy['total'] / 1e12) / latency
+    #     print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}", flush=True)
+    #     with open(file_name, 'a') as f:
+    #         f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy['total']}, {energy['memory_to_l2_transfer']}, {energy['l2_to_l1_transfer']}, {energy['l1_to_l0_transfer']}, {energy['compute']}\n")
+        
+        
             
     print("\n")
