@@ -19,7 +19,7 @@ if __name__ == "__main__":
         gpu_overhead = 12e-6
     elif device_name == "RTX4090":
         system = template_to_system(read_architecture_template("configs/RTX4090.json"))
-        gpu_overhead = 2.05e-5
+        gpu_overhead = 5.96e-5
     elif device_name == "RTX6000Ada":
         system = template_to_system(read_architecture_template("configs/RTX6000Ada.json"))
         gpu_overhead = 6.34e-5
