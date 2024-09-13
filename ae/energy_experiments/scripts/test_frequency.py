@@ -6,6 +6,8 @@ import argparse
 import os
 import subprocess
 import time
+import torch
+import pynvml
 
 def set_gpu_frequency(freq):
     try:
@@ -60,23 +62,20 @@ if __name__ == "__main__":
         with open(file_name, 'w') as f:
             f.write('')
 
-    start_freq = 210
+    start_freq = 615
     end_freq = 2505
     step = 45
-
+    
+    temp_up = True
 
     K = 12288
     N = K
-    M = 1024
+    M = 2048
     titile = f"Performance of Matmul with K={K}, N={N}, M={M}"
     print(f"{titile}")
     
 
     for freq in range(start_freq, end_freq + 1, step):
-        print(f"Setting GPU frequency to {freq} MHz")
-        set_gpu_frequency(freq)
-        
-        time.sleep(1)
         
         model = Matmul(data_type=data_type_dict["fp16"])
         _ = model(
@@ -84,17 +83,44 @@ if __name__ == "__main__":
             Tensor([K, N]),
         )
         
-        latency, latency_average, energy, grephics_freq = model.run_on_gpu()
+        if not (temp_up):
+            target_temp = 67
+            reset_gpu_frequency()
+            print(f"Heat up GPU to {target_temp}°C")
+            input1 = torch.randn(49152, 49152, dtype=torch.float16, device="cuda:0")
+            input2 = torch.randn(49152, 49152, dtype=torch.float16, device="cuda:0")
+            
+            pynvml.nvmlInit()
+            device = pynvml.nvmlDeviceGetHandleByIndex(0)
+            while True:
+                torch.matmul(input1, input2)
+                torch.cuda.synchronize()
+                current_temp = pynvml.nvmlDeviceGetTemperature(device, pynvml.NVML_TEMPERATURE_GPU)
+                if current_temp >= target_temp:
+                    break
+            pynvml.nvmlShutdown()
+        
+        
+        print(f"Setting GPU frequency to {freq} MHz")
+        set_gpu_frequency(freq)
+        
+        # time.sleep(1)
+        
+        latency, latency_average, energy, grephics_freq, temperature, powers = model.run_on_gpu_lim_temp(temp_up)
         energy *= 1e9
         tflops = 2 * M * N * K / latency / 1e12
         power = (energy / 1e12) / latency
-        print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {latency_average*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}pJ, {grephics_freq}MHz", flush=True)
+        print(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {latency_average*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}pJ, {grephics_freq}MHz, , {temperature}, {powers}", flush=True)
         with open(file_name, 'a') as f:
-            f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}, {grephics_freq}\n")
+            f.write(f"{M}, {N}, {K}, {latency*1e3:.4f}ms, {tflops:.4f}Tflops, {power:.2f}W, {energy}, {grephics_freq}, {temperature}, {powers}\n")
     
         time.sleep(1)
         print()
+        reset_gpu_frequency()
+        
+        if temp_up:
+            time.sleep(5)
     
     print("Resetting GPU frequency to default")
-    reset_gpu_frequency()
+    
     print("\n")
