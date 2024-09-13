@@ -25,7 +25,7 @@ if __name__ == "__main__":
         gpu_overhead = 6.34e-5
     elif device_name == "L4":
         system = template_to_system(read_architecture_template("configs/L4.json"))
-        gpu_overhead = 2.22e-5
+        gpu_overhead = 6.16e-5
     
     device = system.device
     
